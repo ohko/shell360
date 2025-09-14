@@ -28,6 +28,13 @@ This repository primarily serves to release Shell360. You can download [the late
 
 [Contribute](./docs/CONTRIBUTE.md)
 
+## License
+
+This project is licensed under the terms of the GNU General Public License v3.0 (GPLv3).
+See the [LICENSE](./LICENSE) file for details.
+
+SPDX-License-Identifier: GPL-3.0-or-later
+
 ## Desktop Screenshots
 
 ### Hosts
