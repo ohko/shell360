@@ -11,11 +11,12 @@ import { useRequest } from 'ahooks';
 import { useEffect } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { changeCryptoPassword } from 'tauri-plugin-data';
+import { Loading } from 'shared';
 
 import useMessage from '@/hooks/useMessage';
 
 import TextFieldPassword from '../TextFieldPassword';
-import Loading from '../Loading';
+
 
 interface ChangeCryptoPasswordProps {
   open: boolean;
@@ -47,7 +48,7 @@ export default function ChangeCryptoPassword({
       onSuccess: () => {
         message.success({
           message: 'Change crypto password success',
-        })
+        });
         onOk();
       },
       onError: () => {
@@ -66,7 +67,14 @@ export default function ChangeCryptoPassword({
   }, [open, formApi]);
 
   return (
-    <Dialog open={open}>
+    <Dialog
+      open={open}
+      sx={{
+        '.MuiDialog-container': {
+          paddingTop: 'env(safe-area-inset-top)',
+        },
+      }}
+    >
       <DialogTitle>Change Crypto Password</DialogTitle>
       <Loading loading={loading} size={32}>
         <DialogContent>

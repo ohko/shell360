@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { SFTPFile, SFTPFileType } from 'tauri-plugin-ssh';
+import { SSHSftpFile, SSHSftpFileType } from 'tauri-plugin-ssh';
 import dayjs from 'dayjs';
 import { Box, Icon, IconButton, Typography } from '@mui/material';
 
@@ -9,16 +9,16 @@ import { SftpTableCell } from './types';
 import SftpFilenameInput from './SftpFilenameInput';
 
 type UseCellsOpts = {
-  selectedFile?: SFTPFile;
+  selectedFile?: SSHSftpFile;
   editingFilename?: string;
   onEditingFilenameChange: (filename: string) => unknown;
   onRenameCancel: () => unknown;
   onRenameOk: () => unknown;
-  onRename: (item: SFTPFile) => unknown;
-  downloadFile: (item: SFTPFile) => unknown;
-  removeDir: (item: SFTPFile) => unknown;
-  removeFile: (item: SFTPFile) => unknown;
-  onSelectDir: (item: SFTPFile) => unknown;
+  onRename: (item: SSHSftpFile) => unknown;
+  downloadFile: (item: SSHSftpFile) => unknown;
+  removeDir: (item: SSHSftpFile) => unknown;
+  removeFile: (item: SSHSftpFile) => unknown;
+  onSelectDir: (item: SSHSftpFile) => unknown;
   modal: ReturnType<typeof useModal>;
 };
 
@@ -39,9 +39,9 @@ export default function useCells({
   removeDir,
   onSelectDir,
   modal,
-}: UseCellsOpts): SftpTableCell<SFTPFile>[] {
+}: UseCellsOpts): SftpTableCell<SSHSftpFile>[] {
   const onDoubleClickName = useCallback(
-    (row: SFTPFile) => {
+    (row: SSHSftpFile) => {
       if (selectedFile?.path === row.path) {
         return;
       }
@@ -51,7 +51,7 @@ export default function useCells({
   );
 
   const onDelete = useCallback(
-    (row: SFTPFile) => {
+    (row: SSHSftpFile) => {
       modal.confirm({
         title: 'Delete Confirmation',
         content: `Are you sure to delete ${row.name}?`,
@@ -59,7 +59,7 @@ export default function useCells({
           color: 'warning',
         },
         onOk: () => {
-          if (row.fileType === SFTPFileType.Dir) {
+          if (row.fileType === SSHSftpFileType.Dir) {
             removeDir(row);
           } else {
             removeFile(row);
@@ -75,15 +75,15 @@ export default function useCells({
       id: 'name',
       key: 'name',
       title: 'Name',
-      compare: (a: SFTPFile, b: SFTPFile) => b.name.localeCompare(a.name),
+      compare: (a: SSHSftpFile, b: SSHSftpFile) => b.name.localeCompare(a.name),
       maxWidth: 320,
       minWidth: 320,
-      render: (item: SFTPFile) => {
+      render: (item: SSHSftpFile) => {
         const icons = {
-          [SFTPFileType.Dir]: 'icon-folder',
-          [SFTPFileType.File]: 'icon-file',
-          [SFTPFileType.Symlink]: 'icon-symlink',
-          [SFTPFileType.Other]: 'icon-file',
+          [SSHSftpFileType.Dir]: 'icon-folder',
+          [SSHSftpFileType.File]: 'icon-file',
+          [SSHSftpFileType.Symlink]: 'icon-symlink',
+          [SSHSftpFileType.Other]: 'icon-file',
         };
 
         return (
@@ -152,11 +152,11 @@ export default function useCells({
       id: 'mtime',
       key: 'mtime',
       title: 'Date Modified',
-      compare: (a: SFTPFile, b: SFTPFile) => b.mtime - a.mtime,
+      compare: (a: SSHSftpFile, b: SSHSftpFile) => b.mtime - a.mtime,
       width: 170,
       maxWidth: 170,
       minWidth: 170,
-      render: (item: SFTPFile) =>
+      render: (item: SSHSftpFile) =>
         dayjs.unix(item.mtime).format('YYYY-MM-DD HH:mm:ss'),
     },
     {
@@ -166,9 +166,9 @@ export default function useCells({
       width: 120,
       maxWidth: 120,
       minWidth: 120,
-      compare: (a: SFTPFile, b: SFTPFile) => b.size - a.size,
-      render: (item: SFTPFile) => {
-        if (item.fileType !== SFTPFileType.File) {
+      compare: (a: SSHSftpFile, b: SSHSftpFile) => b.size - a.size,
+      render: (item: SSHSftpFile) => {
+        if (item.fileType !== SSHSftpFileType.File) {
           return '-';
         }
 
@@ -211,7 +211,7 @@ export default function useCells({
           boxShadow: (theme) => theme.shadows[5],
         };
       },
-      render: (item: SFTPFile) => (
+      render: (item: SSHSftpFile) => (
         <Box
           sx={{
             display: 'flex',
@@ -220,7 +220,7 @@ export default function useCells({
           }}
         >
           <IconButton
-            disabled={item.fileType !== SFTPFileType.File}
+            disabled={item.fileType !== SSHSftpFileType.File}
             onClick={() => downloadFile(item)}
           >
             <Icon className="icon-file-download"></Icon>

@@ -10,10 +10,11 @@ import {
 import { useRequest } from 'ahooks';
 import { Controller, useForm } from 'react-hook-form';
 import { changeCryptoEnable } from 'tauri-plugin-data';
+import { Loading } from 'shared';
 
 import TextFieldPassword from '@/components/TextFieldPassword';
 import useMessage from '@/hooks/useMessage';
-import Loading from '@/components/Loading';
+
 
 interface IniCryptoProps {
   open: boolean;
@@ -59,7 +60,14 @@ export default function IniCrypto({ open, onCancel, onOk }: IniCryptoProps) {
   const loading = initCryptoPasswordLoading;
 
   return (
-    <Dialog open={open}>
+    <Dialog
+      open={open}
+      sx={{
+        '.MuiDialog-container': {
+          paddingTop: 'env(safe-area-inset-top)',
+        },
+      }}
+    >
       <DialogTitle>Initialize Crypto</DialogTitle>
       <Loading loading={loading} size={48}>
         <DialogContent>

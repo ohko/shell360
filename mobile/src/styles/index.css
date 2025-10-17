@@ -2,7 +2,6 @@
 @import "@fontsource/roboto/400.css";
 @import "@fontsource/roboto/500.css";
 @import "@fontsource/roboto/700.css";
-@import "shared/dist/index.css";
 
 *::-webkit-scrollbar {
   width: 6px;
@@ -27,15 +26,18 @@
 html,
 body,
 #root {
-  height: 100%;
+  height: 100vh;
   overflow: hidden;
   user-select: none;
 }
-
 
 input {
   &::-ms-clear,
   &::-ms-reveal {
     display: none;
   }
+}
+
+.notistack-snackbar-root {
+  padding-top: env(safe-area-inset-top);
 }

@@ -6,9 +6,6 @@ use serde_json::json;
 use strum::AsRefStr;
 use thiserror::Error;
 
-use crate::sftp::sftp_manager::UnboundedChannelMessage as SFTPManagerUnboundedChannelMessage;
-use crate::ssh::ssh_manager::UnboundedChannelMessage as SSHManagerUnboundedChannelMessage;
-
 #[derive(Debug, Serialize)]
 pub enum AuthMethod {
   PrivateKey,
@@ -40,17 +37,7 @@ pub enum SSHError {
   TauriError(#[from] tauri::Error),
 
   #[error(transparent)]
-  TokioSyncMpscErrorSendErrorSSHManagerUnboundedChannelMessage(
-    #[from] tokio::sync::mpsc::error::SendError<SSHManagerUnboundedChannelMessage>,
-  ),
-
-  #[error(transparent)]
   TokioSyncMpscErrorSendError(#[from] tokio::sync::mpsc::error::SendError<()>),
-
-  #[error(transparent)]
-  TokioSyncMpscErrorSendErrorSFTPManagerUnboundedChannelMessage(
-    #[from] tokio::sync::mpsc::error::SendError<SFTPManagerUnboundedChannelMessage>,
-  ),
 
   #[error(transparent)]
   TokioSyncMpscErrorSendErrorAddr(#[from] tokio::sync::mpsc::error::SendError<(String, u16)>),
@@ -80,15 +67,6 @@ pub enum SSHError {
   #[error("Not found session")]
   NotFoundSession,
 
-  #[error("Not found shell channel")]
-  NotFoundShellChannel,
-
-  #[error("Not found unbounded sender")]
-  NotFoundUnboundedSender,
-
-  #[error("Not found port forwarding")]
-  NotFoundPortForwardings,
-
   #[error("Not found sftp")]
   NotFoundSftp,
 
@@ -98,11 +76,8 @@ pub enum SSHError {
   #[error(transparent)]
   UuidError(#[from] uuid::Error),
 
-  #[error("Not found parameter {0}")]
-  NotFoundParameter(String),
-
-  #[error("Invalid parameter {0}")]
-  InvalidParameter(String),
+  #[error("{0}")]
+  Error(String),
 }
 
 impl Serialize for SSHError {

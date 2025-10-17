@@ -1,7 +1,7 @@
 import { open, save } from '@tauri-apps/plugin-dialog';
 import { useRequest } from 'ahooks';
-import { MutableRefObject } from 'react';
-import { SFTP, SFTPFile } from 'tauri-plugin-ssh';
+import { MutableRefObject, useState } from 'react';
+import { SSHSftp, SSHSftpFile } from 'tauri-plugin-ssh';
 import { Icon } from '@mui/material';
 
 import useMessage from '@/hooks/useMessage';
@@ -11,7 +11,7 @@ type UseSftpActionsOpts = {
   dirname?: string;
   message: ReturnType<typeof useMessage>;
   modal: ReturnType<typeof useModal>;
-  sftpRef: MutableRefObject<SFTP | null>;
+  sftpRef: MutableRefObject<SSHSftp | null>;
   refreshDir: () => unknown;
 };
 
@@ -22,6 +22,8 @@ export default function useSftpActions({
   sftpRef,
   refreshDir,
 }: UseSftpActionsOpts) {
+  const [progress, setProgress] = useState(0);
+
   const { loading: uploadFileLoading, run: uploadFile } = useRequest(
     async () => {
       const file = await open({
@@ -58,6 +60,9 @@ export default function useSftpActions({
       await sftpRef.current?.sftpUploadFile({
         localFilename: file,
         remoteFilename: filename,
+        onProgress: ({ progress, total }) => {
+          setProgress(Math.round((progress / total) * 100));
+        },
       });
 
       return false;
@@ -81,7 +86,7 @@ export default function useSftpActions({
   );
 
   const { loading: downloadFileLoading, run: downloadFile } = useRequest(
-    async ({ name, path }: SFTPFile) => {
+    async ({ name, path }: SSHSftpFile) => {
       const file = await save({
         defaultPath: name,
       });
@@ -93,6 +98,9 @@ export default function useSftpActions({
       await sftpRef.current?.sftpDownloadFile({
         localFilename: file,
         remoteFilename: path,
+        onProgress: ({ progress, total }) => {
+          setProgress(Math.round((progress / total) * 100));
+        },
       });
 
       return false;
@@ -115,7 +123,7 @@ export default function useSftpActions({
   );
 
   const { loading: removeFileLoading, run: removeFile } = useRequest(
-    async ({ path }: SFTPFile) => {
+    async ({ path }: SSHSftpFile) => {
       await sftpRef.current?.sftpRemoveFile(path);
     },
     {
@@ -133,7 +141,7 @@ export default function useSftpActions({
   );
 
   const { loading: removeDirLoading, run: removeDir } = useRequest(
-    async ({ path }: SFTPFile) => {
+    async ({ path }: SSHSftpFile) => {
       await sftpRef.current?.sftpRemoveDir(path);
     },
     {
@@ -151,6 +159,7 @@ export default function useSftpActions({
   );
 
   return {
+    progress,
     uploadFile,
     uploadFileLoading,
     downloadFile,
