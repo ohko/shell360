@@ -1,6 +1,6 @@
 {
   "productName": "Shell360",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "identifier": "com.nashaofu.shell360",
   "app": {
     "windows": [
@@ -17,7 +17,12 @@
     "security": {
       "csp": {
         "default-src": ["'self'"],
-        "connect-src": ["'self'", "http://ipc.localhost"],
+        "script-src": ["'self'", "https://cloud.umami.is"],
+        "connect-src": [
+          "'self'",
+          "http://ipc.localhost",
+          "https://api-gateway.umami.dev"
+        ],
         "style-src": ["'self'", "'unsafe-inline'"],
         "font-src": ["'self'", "data:"],
         "img-src": ["'self'", "data:"]
@@ -27,7 +32,7 @@
   "plugins": {
     "updater": {
       "endpoints": [
-        "https://github.com/shell360/release/releases/latest/download/latest.json"
+        "https://github.com/nashaofu/shell360/releases/latest/download/latest.json"
       ],
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEExNTNFMDQ0MEIzRTgwMTUKUldRVmdENExST0JUb1pja2JsYWNBS0V0cGpkZHF4S0dLRGxhWFgvN2RhcUpwTVF6N09icmhqenMK",
       "windows": {

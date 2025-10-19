@@ -2,6 +2,7 @@ import { Update, check } from '@tauri-apps/plugin-updater';
 import { atom, useAtom } from 'jotai';
 import { useCallback, useEffect } from 'react';
 import { useLatest } from 'ahooks';
+import { relaunch } from '@tauri-apps/plugin-process';
 
 export type UpdateAtom = {
   openUpdateDialog: boolean;
@@ -66,11 +67,14 @@ export function useAutoCheckUpdate() {
   const checkUpdate = useCheckUpdate();
   useEffect(() => {
     const autoCheck = async () => {
+      let update: Update | null = null;
       try {
-        await checkUpdate();
+        update = await checkUpdate();
       } finally {
         clearTimeout(timer);
-        timer = window.setTimeout(() => autoCheck(), 1000 * 60 * 3);
+        if (!update) {
+          timer = window.setTimeout(() => autoCheck(), 1000 * 60 * 3);
+        }
       }
     };
 
@@ -87,70 +91,88 @@ export function useUpdateAtom() {
   const checkUpdate = useCheckUpdate();
 
   const stateRef = useLatest(state);
+  const update = state.update;
 
   const setOpenUpdateDialog = useCallback(
     (openUpdateDialog: boolean) => {
-      setState({
+      stateRef.current = {
         ...stateRef.current,
         openUpdateDialog,
-      });
+      };
+      setState(stateRef.current);
     },
     [setState, stateRef]
   );
 
-  const downloadAndInstall = useCallback(async () => {
+  const download = useCallback(async () => {
     const { update } = stateRef.current;
     if (!update) {
       return;
     }
 
     try {
-      setState({
+      stateRef.current = {
         ...stateRef.current,
         isDownloading: true,
         error: undefined,
         total: 0,
         downloaded: 0,
-      });
+      };
+      setState(stateRef.current);
 
-      await update.downloadAndInstall((event) => {
+      await update.download((event) => {
         if (event.event === 'Started') {
-          setState({
+          stateRef.current = {
             ...stateRef.current,
             total: event.data.contentLength,
             downloaded: 0,
-          });
+          };
+          setState(stateRef.current);
         } else if (event.event === 'Progress') {
-          setState({
+          stateRef.current = {
             ...stateRef.current,
-            downloaded: event.data.chunkLength,
-          });
+            downloaded:
+              event.data.chunkLength + (stateRef.current.downloaded || 0),
+          };
+          setState(stateRef.current);
         } else if (event.event === 'Finished') {
-          setState({
+          stateRef.current = {
             ...stateRef.current,
             downloaded: stateRef.current.total,
-          });
+          };
+          setState(stateRef.current);
         }
       });
 
-      setState({
+      stateRef.current = {
         ...stateRef.current,
         isDownloading: false,
         error: undefined,
-      });
+      };
+      setState(stateRef.current);
     } catch (err) {
-      setState({
+      stateRef.current = {
         ...stateRef.current,
         isDownloading: false,
         error: err,
-      });
+      };
+      setState(stateRef.current);
     }
   }, [setState, stateRef]);
+
+  const install = useCallback(() => {
+    update?.install().finally(() => {
+      if (import.meta.env.TAURI_PLATFORM === 'darwin') {
+        relaunch();
+      }
+    });
+  }, [update]);
 
   return {
     ...state,
     setOpenUpdateDialog,
     checkUpdate,
-    downloadAndInstall,
+    download,
+    install,
   };
 }
