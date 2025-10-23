@@ -221,6 +221,9 @@ export default function EditHostForm({ formApi }: EditHostFormProps) {
               <MenuItem value={AuthenticationMethod.PublicKey}>
                 PublicKey
               </MenuItem>
+              <MenuItem value={AuthenticationMethod.Certificate}>
+                Certificate
+              </MenuItem>
             </TextField>
           )}
         />
@@ -251,14 +254,15 @@ export default function EditHostForm({ formApi }: EditHostFormProps) {
           />
         )}
 
-        {authenticationMethod === AuthenticationMethod.PublicKey && (
+        {(authenticationMethod === AuthenticationMethod.PublicKey ||
+          authenticationMethod === AuthenticationMethod.Certificate) && (
           <Controller
             name="keyId"
             control={formApi.control}
             rules={{
               required: {
                 value: true,
-                message: 'Please select public key',
+                message: 'Please select key',
               },
             }}
             render={({ field, fieldState }) => (
@@ -279,7 +283,7 @@ export default function EditHostForm({ formApi }: EditHostFormProps) {
                   <ListItemIcon>
                     <Icon className="icon-add" />
                   </ListItemIcon>
-                  <ListItemText>Add public key</ListItemText>
+                  <ListItemText>Add key</ListItemText>
                 </MenuItem>
                 {keys.map((item) => (
                   <MenuItem key={item.id} value={item.id}>

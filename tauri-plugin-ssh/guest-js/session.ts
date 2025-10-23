@@ -22,11 +22,26 @@ export type SSHSessionDisconnectEvent = {
 
 export type SSHSessionIpcChannelEvent = SSHSessionDisconnectEvent;
 
-export type SSHSessionAuthenticateOpts = {
+export enum AuthenticationMethod {
+  Password = 'Password',
+  PublicKey = 'PublicKey',
+  Certificate = 'Certificate',
+}
+
+export type SSHSessionAuthenticatePasswordOpts = {
   username: string;
-  password?: string;
-  privateKey?: string;
+  password: string;
+};
+export type SSHSessionAuthenticatePublicKeyOpts = {
+  username: string;
+  privateKey: string;
   passphrase?: string;
+};
+export type SSHSessionAuthenticateCertificateOpts = {
+  username: string;
+  privateKey: string;
+  passphrase?: string;
+  certificate: string;
 };
 
 export class SSHSession {
@@ -53,9 +68,44 @@ export class SSHSession {
     });
   }
 
-  authenticate(opts: SSHSessionAuthenticateOpts): Promise<string> {
+  authenticate_password(
+    opts: SSHSessionAuthenticatePasswordOpts
+  ): Promise<string> {
     return invoke<string>('plugin:ssh|session_authenticate', {
-      ...opts,
+      username: opts.username,
+      authenticationData: {
+        authenticationMethod: AuthenticationMethod.Password,
+        password: opts.password,
+      },
+      sshSessionId: this.sshSessionId,
+    });
+  }
+
+  authenticate_public_key(
+    opts: SSHSessionAuthenticatePublicKeyOpts
+  ): Promise<string> {
+    return invoke<string>('plugin:ssh|session_authenticate', {
+      username: opts.username,
+      authenticationData: {
+        authenticationMethod: AuthenticationMethod.PublicKey,
+        privateKey: opts.privateKey,
+        passphrase: opts.passphrase,
+      },
+      sshSessionId: this.sshSessionId,
+    });
+  }
+
+  authenticate_certificate(
+    opts: SSHSessionAuthenticateCertificateOpts
+  ): Promise<string> {
+    return invoke<string>('plugin:ssh|session_authenticate', {
+      username: opts.username,
+      authenticationData: {
+        authenticationMethod: AuthenticationMethod.Certificate,
+        privateKey: opts.privateKey,
+        passphrase: opts.passphrase,
+        certificate: opts.certificate,
+      },
       sshSessionId: this.sshSessionId,
     });
   }

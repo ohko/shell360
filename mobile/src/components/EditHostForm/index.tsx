@@ -218,7 +218,12 @@ export default function EditHostForm({ formApi }: EditHostFormProps) {
               <MenuItem value={AuthenticationMethod.Password}>
                 Password
               </MenuItem>
-              <MenuItem value={AuthenticationMethod.PublicKey}>PublicKey</MenuItem>
+              <MenuItem value={AuthenticationMethod.PublicKey}>
+                PublicKey
+              </MenuItem>
+              <MenuItem value={AuthenticationMethod.Certificate}>
+                Certificate
+              </MenuItem>
             </TextField>
           )}
         />
@@ -249,7 +254,8 @@ export default function EditHostForm({ formApi }: EditHostFormProps) {
           />
         )}
 
-        {authenticationMethod === AuthenticationMethod.PublicKey && (
+        {(authenticationMethod === AuthenticationMethod.PublicKey ||
+          authenticationMethod === AuthenticationMethod.Certificate) && (
           <Controller
             name="keyId"
             control={formApi.control}

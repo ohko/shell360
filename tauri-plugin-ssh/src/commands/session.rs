@@ -7,14 +7,14 @@ use std::{
 use russh::{
   Disconnect, Error as RusshError,
   client::{self, Handle},
-  keys::{HashAlg, decode_secret_key, key::PrivateKeyWithHashAlg},
+  keys::{Certificate, HashAlg, decode_secret_key, key::PrivateKeyWithHashAlg},
 };
 use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Runtime, State, ipc::Channel};
 use uuid::Uuid;
 
 use crate::{
-  error::{AuthMethod, SSHError, SSHResult},
+  error::{AuthenticationMethodError, SSHError, SSHResult},
   ssh_client::{DisconnectReason, SSHClient},
   ssh_manager::SSHManager,
 };
@@ -122,71 +122,136 @@ pub async fn session_connect<R: Runtime>(
   Ok(ssh_session_id)
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(tag = "authenticationMethod", rename_all_fields = "camelCase")]
+pub enum AuthenticationData {
+  Password {
+    password: String,
+  },
+  PublicKey {
+    private_key: String,
+    passphrase: Option<String>,
+  },
+  Certificate {
+    private_key: String,
+    passphrase: Option<String>,
+    certificate: String,
+  },
+}
+
 #[tauri::command]
 pub async fn session_authenticate<R: Runtime>(
   _app_handle: AppHandle<R>,
   ssh_manager: State<'_, SSHManager<R>>,
   ssh_session_id: SSHSessionId,
   username: &str,
-  password: Option<&str>,
-  private_key: Option<&str>,
-  passphrase: Option<&str>,
+  authentication_data: AuthenticationData,
 ) -> SSHResult<SSHSessionId> {
   log::info!("authenticate session");
-
   let mut sessions = ssh_manager.sessions.lock().await;
   let session = sessions
     .get_mut(&ssh_session_id)
     .ok_or(SSHError::NotFoundSession)?;
 
-  if let Some(private_key) = private_key {
-    log::info!("authenticate by private key");
+  match authentication_data {
+    AuthenticationData::Password { password } => {
+      log::info!("authenticate by password");
 
-    let password = passphrase.and_then(|passphrase| {
-      if passphrase.is_empty() {
-        None
-      } else {
-        log::info!("authenticate by private key with passphrase");
-        Some(passphrase)
+      let auth_res = session.authenticate_password(username, password).await?;
+
+      log::info!("authenticate by password result {:?}", auth_res.success());
+
+      if !auth_res.success() {
+        return Err(AuthenticationMethodError::Password.into());
       }
-    });
-
-    let key_pair = decode_secret_key(private_key, password)?;
-    log::info!(
-      "authenticate by private key with key pair {:?}",
-      key_pair.algorithm()
-    );
-    let auth_res = session
-      .authenticate_publickey(
-        username,
-        // Some(HashAlg::Sha512) 只在 RSA 算法中生效，其他算法内部会忽略该参数
-        PrivateKeyWithHashAlg::new(Arc::new(key_pair), Some(HashAlg::Sha512)),
-      )
-      .await?;
-
-    log::info!(
-      "authenticate by private key with result {:?}",
-      auth_res.success()
-    );
-
-    if !auth_res.success() {
-      return Err(SSHError::AuthFailed {
-        auth_method: AuthMethod::PrivateKey,
-      });
     }
-  } else if let Some(password) = password {
-    let auth_res = session.authenticate_password(username, password).await?;
+    AuthenticationData::PublicKey {
+      private_key,
+      passphrase,
+    } => {
+      log::info!("authenticate by public key");
 
-    if !auth_res.success() {
-      return Err(SSHError::AuthFailed {
-        auth_method: AuthMethod::Password,
+      if private_key.is_empty() {
+        return Err(SSHError::new("Private key is empty"));
+      }
+
+      let password = passphrase.and_then(|passphrase| {
+        if passphrase.is_empty() {
+          log::info!("authenticate by public key passphrase is empty");
+          None
+        } else {
+          log::info!("authenticate by public key passphrase is not empty");
+          Some(passphrase)
+        }
       });
+
+      let key_pair = decode_secret_key(&private_key, password.as_deref())?;
+      log::info!("authenticate by public key {:?}", key_pair.algorithm());
+
+      let auth_res = session
+        .authenticate_publickey(
+          username,
+          PrivateKeyWithHashAlg::new(Arc::new(key_pair), Some(HashAlg::Sha512)),
+        )
+        .await?;
+
+      log::info!("authenticate by public key result {:?}", auth_res.success());
+
+      if !auth_res.success() {
+        return Err(AuthenticationMethodError::PublicKey.into());
+      }
     }
-  } else {
-    return Err(SSHError::AuthFailed {
-      auth_method: AuthMethod::NotSupported,
-    });
-  };
+    AuthenticationData::Certificate {
+      private_key,
+      passphrase,
+      certificate,
+    } => {
+      log::info!("authenticate by certificate");
+
+      if private_key.is_empty() {
+        return Err(SSHError::new("Private key is empty"));
+      }
+      if certificate.is_empty() {
+        return Err(SSHError::new("Certificate is empty"));
+      }
+
+      let password = passphrase.and_then(|passphrase| {
+        if passphrase.is_empty() {
+          log::info!("authenticate by certificate passphrase is empty");
+          None
+        } else {
+          log::info!("authenticate by certificate passphrase is not empty");
+          Some(passphrase)
+        }
+      });
+
+      let key_pair = decode_secret_key(&private_key, password.as_deref())?;
+      log::info!(
+        "authenticate by certificate with private key {:?}",
+        key_pair.algorithm()
+      );
+
+      let cert = Certificate::from_openssh(&certificate)
+        .map_err(|err| SSHError::new(format!("Failed to parse certificate: {}", err)))?;
+      log::info!(
+        "authenticate by certificate with certificate {:?}",
+        cert.algorithm()
+      );
+
+      let auth_res = session
+        .authenticate_openssh_cert(username, Arc::new(key_pair), cert)
+        .await?;
+
+      log::info!(
+        "authenticate by certificate result {:?}",
+        auth_res.success()
+      );
+
+      if !auth_res.success() {
+        return Err(AuthenticationMethodError::Certificate.into());
+      }
+    }
+  }
 
   Ok(ssh_session_id)
 }
