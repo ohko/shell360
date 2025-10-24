@@ -1,6 +1,6 @@
 {
   "productName": "Shell360",
-  "version": "0.1.9",
+  "version": "0.1.10",
   "identifier": "com.nashaofu.shell360",
   "app": {
     "windows": [
@@ -20,6 +20,7 @@
         "script-src": ["'self'", "https://cloud.umami.is"],
         "connect-src": [
           "'self'",
+          "ipc://localhost",
           "http://ipc.localhost",
           "https://api-gateway.umami.dev"
         ],
