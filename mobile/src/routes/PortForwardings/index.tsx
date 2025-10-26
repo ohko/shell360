@@ -9,18 +9,15 @@ import {
   ListItemText,
   OutlinedInput,
 } from '@mui/material';
-import {
-  SSHSessionCheckServerKey,
-  SSHPortForwarding,
-  SSHSession,
-} from 'tauri-plugin-ssh';
+import { SSHSessionCheckServerKey } from 'tauri-plugin-ssh';
 import { useRequest } from 'ahooks';
-import { useHosts, useKeys, usePortForwardings } from 'shared';
+import { useHosts, useKeys, usePortForwardings, Dropdown } from 'shared';
 import {
   AuthenticationMethod,
   deletePortForwarding,
-  Host,
-  PortForwarding,
+  type Host,
+  type Key,
+  type PortForwarding,
   PortForwardingType,
 } from 'tauri-plugin-data';
 
@@ -29,9 +26,8 @@ import Page from '@/components/Page';
 import ItemCard from '@/components/ItemCard';
 import AutoRepeatGrid from '@/components/AutoRepeatGrid';
 import useModal from '@/hooks/useModal';
-import Dropdown from '@/components/Dropdown';
 import {
-  OpenedForwarding,
+  type OpenedForwarding,
   OpenedForwardingStatus,
   useOpenedForwardingAtomWithApi,
 } from '@/atom/openedForwarding';
@@ -155,25 +151,23 @@ export default function PortForwardings() {
         },
       },
     ],
-    [modal, refreshPortForwardings]
+    [modal, refreshPortForwardings, selectedPortForwardingRef]
   );
 
   const closePortForwarding = useCallback(
-    async (openedForwarding: OpenedForwarding, dispose?: boolean) => {
+    async (openedForwarding: OpenedForwarding) => {
       const item = openedForwarding.portForwarding;
-      const ssh = openedForwarding.ssh;
-      try {
-        if (item.portForwardingType === PortForwardingType.Local) {
-          await ssh.closeLocalPortForwarding();
-        } else if (item.portForwardingType === PortForwardingType.Remote) {
-          await ssh.closeRemotePortForwarding();
-        } else if (item.portForwardingType === PortForwardingType.Dynamic) {
-          await ssh.closeDynamicPortForwarding();
-        }
-      } finally {
-        if (dispose) {
-          await ssh.session.disconnect();
-        }
+      const sshPortForwarding = openedForwarding.sshPortForwarding;
+      if (item.portForwardingType === PortForwardingType.Local) {
+        await sshPortForwarding.closeLocalPortForwarding();
+      } else if (item.portForwardingType === PortForwardingType.Remote) {
+        await sshPortForwarding.closeRemotePortForwarding();
+      } else if (item.portForwardingType === PortForwardingType.Dynamic) {
+        await sshPortForwarding.closeDynamicPortForwarding();
+      }
+      const sshSessions = [...openedForwarding.sshSessions].reverse();
+      for (const { session } of sshSessions) {
+        await session.disconnect();
       }
     },
     []
@@ -184,46 +178,50 @@ export default function PortForwardings() {
       opened: OpenedForwarding,
       checkServerKey?: SSHSessionCheckServerKey
     ) => {
+      const keysMap = keys.reduce((acc, key) => {
+        acc.set(key.id, key);
+        return acc;
+      }, new Map<string, Key>());
+
+      for (const sshSession of opened.sshSessions) {
+        const { session, host } = sshSession;
+        await session.connect(
+          {
+            hostname: host.hostname,
+            port: host.port,
+          },
+          checkServerKey
+        );
+
+        const key = keysMap.get(host.keyId as string);
+
+        if (host.authenticationMethod === AuthenticationMethod.Password) {
+          await session.authenticate_password({
+            username: host.username,
+            password: host.password || '',
+          });
+        } else if (
+          host.authenticationMethod === AuthenticationMethod.PublicKey
+        ) {
+          await session.authenticate_public_key({
+            username: host.username,
+            privateKey: key?.privateKey || '',
+            passphrase: key?.passphrase || '',
+          });
+        } else {
+          await session.authenticate_certificate({
+            username: host.username,
+            privateKey: key?.privateKey || '',
+            passphrase: key?.passphrase || '',
+            certificate: key?.certificate || '',
+          });
+        }
+      }
+
       const portForwarding = opened.portForwarding;
-      const ssh = opened.ssh;
-      const host = hosts.find((item) => item.id === portForwarding.hostId);
-
-      if (!host) {
-        throw new Error('The SSH host configuration does not exist.');
-      }
-
-      const key = keys.find((item) => item.id === host.keyId);
-
-      await ssh.session.connect(
-        {
-          hostname: host.hostname,
-          port: host.port,
-        },
-        checkServerKey
-      );
-
-      if (host.authenticationMethod === AuthenticationMethod.Password) {
-        await ssh.session.authenticate_password({
-          username: host.username,
-          password: host.password || '',
-        });
-      } else if (host.authenticationMethod === AuthenticationMethod.PublicKey) {
-        await ssh.session.authenticate_public_key({
-          username: host.username,
-          privateKey: key?.privateKey || '',
-          passphrase: key?.passphrase || '',
-        });
-      } else {
-        await ssh.session.authenticate_certificate({
-          username: host.username,
-          privateKey: key?.privateKey || '',
-          passphrase: key?.passphrase || '',
-          certificate: key?.certificate || '',
-        });
-      }
-
+      const sshPortForwarding = opened.sshPortForwarding;
       if (portForwarding.portForwardingType === PortForwardingType.Local) {
-        await ssh.openLocalPortForwarding({
+        await sshPortForwarding.openLocalPortForwarding({
           localAddress: portForwarding.localAddress,
           localPort: portForwarding.localPort,
           remoteAddress: portForwarding.remoteAddress as string,
@@ -232,7 +230,7 @@ export default function PortForwardings() {
       } else if (
         portForwarding.portForwardingType === PortForwardingType.Remote
       ) {
-        await ssh.openRemotePortForwarding({
+        await sshPortForwarding.openRemotePortForwarding({
           localAddress: portForwarding.localAddress,
           localPort: portForwarding.localPort,
           remoteAddress: portForwarding.remoteAddress as string,
@@ -241,7 +239,7 @@ export default function PortForwardings() {
       } else if (
         portForwarding.portForwardingType === PortForwardingType.Dynamic
       ) {
-        await ssh.openDynamicPortForwarding({
+        await sshPortForwarding.openDynamicPortForwarding({
           localAddress: portForwarding.localAddress,
           localPort: portForwarding.localPort,
         });
@@ -271,13 +269,11 @@ export default function PortForwardings() {
       const opened = openedForwardingMap.get(item.id);
       if (opened) {
         openedForwardingWithApi.delete(opened.uuid);
-        await closePortForwarding(opened, true);
+        await closePortForwarding(opened);
         return;
       }
 
-      const session = new SSHSession({});
-      const ssh = new SSHPortForwarding({ session });
-      const [added] = openedForwardingWithApi.add(item, ssh);
+      const [added] = openedForwardingWithApi.add(item);
       connect(added);
     },
     [closePortForwarding, connect, openedForwardingMap, openedForwardingWithApi]
