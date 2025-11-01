@@ -1,4 +1,4 @@
-use std::ops::Deref;
+use std::{collections::HashMap, env, ops::Deref};
 
 use russh::{Channel as RusshChannel, client};
 use serde::{Deserialize, Serialize};
@@ -42,6 +42,7 @@ pub struct SSHShellId(Uuid);
 
 pub struct SSHShell {
   pub ssh_session_id: SSHSessionId,
+  #[allow(unused)]
   pub ssh_shell_id: SSHShellId,
   pub ipc_channel: Channel<SHHShellIpcChannelData>,
   pub shell_channel: RusshChannel<client::Msg>,
@@ -79,6 +80,19 @@ pub struct ShellSize {
   pub height: u32,
 }
 
+fn prepare_envs(custom_envs: HashMap<String, String>) -> HashMap<String, String> {
+  let mut envs = env::vars()
+    .filter(|(key, _)| key.starts_with("LC_") || key.starts_with("LANG_"))
+    .collect::<HashMap<String, String>>();
+
+  let lang = env::var("LANG").unwrap_or("C.UTF-8".to_string());
+  envs.insert("LANG".to_string(), lang);
+
+  envs.extend(custom_envs);
+
+  envs
+}
+
 #[tauri::command]
 pub async fn shell_open<R: Runtime>(
   _app_handle: AppHandle<R>,
@@ -86,8 +100,11 @@ pub async fn shell_open<R: Runtime>(
   ssh_session_id: SSHSessionId,
   ssh_shell_id: SSHShellId,
   ipc_channel: Channel<SHHShellIpcChannelData>,
+  term: Option<String>,
+  envs: Option<HashMap<String, String>>,
   size: ShellSize,
 ) -> SSHResult<SSHShellId> {
+  log::info!("shell open {:?} {:?}", ssh_session_id, ssh_shell_id);
   let shell = {
     let sessions = ssh_manager.sessions.lock().await;
     let session = sessions
@@ -98,15 +115,30 @@ pub async fn shell_open<R: Runtime>(
     SSHShell::new(ssh_session_id, ssh_shell_id, ipc_channel, shell_channel)
   };
 
-  shell
-    .set_env(true, "LANG", "en_US.UTF-8")
-    .await
-    .unwrap_or_default();
+  let envs = prepare_envs(envs.unwrap_or_default());
 
+  log::info!(
+    "shell open {:?} {:?} set env {:?}",
+    ssh_session_id,
+    ssh_shell_id,
+    envs
+  );
+  for (key, value) in envs {
+    shell.set_env(true, key.as_str(), value.as_str()).await?;
+  }
+
+  let term = term.unwrap_or("xterm-256color".to_string());
+  log::info!(
+    "shell open {:?} {:?} request pty {} {:?}",
+    ssh_session_id,
+    ssh_shell_id,
+    term,
+    size
+  );
   shell
     .request_pty(
       true,
-      "xterm-256color",
+      &term,
       size.col,
       size.row,
       size.width,
@@ -115,6 +147,11 @@ pub async fn shell_open<R: Runtime>(
     )
     .await?;
 
+  log::info!(
+    "shell open {:?} {:?} request shell",
+    ssh_session_id,
+    ssh_shell_id
+  );
   shell.request_shell(true).await?;
 
   {

@@ -1,6 +1,6 @@
 {
   "productName": "Shell360",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "identifier": "com.nashaofu.shell360",
   "app": {
     "windows": [
@@ -55,12 +55,6 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ],
-    "iOS": {
-      "developmentTeam": "2A5UB5KQ66"
-    },
-    "macOS": {
-      "signingIdentity": "Developer ID Application: diao cheng (2A5UB5KQ66)"
-    }
+    ]
   }
 }

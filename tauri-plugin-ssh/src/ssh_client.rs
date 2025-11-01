@@ -35,6 +35,7 @@ pub struct SSHClient<R: Runtime> {
   ssh_session_id: SSHSessionId,
   hostname: String,
   port: u16,
+  #[allow(unused)]
   jump_host_ssh_session_id: Option<SSHSessionId>,
   check_server_key: Option<SSHSessionCheckServerKey>,
 }

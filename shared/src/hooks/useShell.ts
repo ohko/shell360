@@ -38,10 +38,17 @@ export function useShell({ session, host, onClose }: UseShellOpts) {
       shellRef.current = shell;
 
       await shell.open({
-        col: terminal.cols,
-        row: terminal.rows,
-        width: terminal.element?.clientWidth ?? 0,
-        height: terminal.element?.clientHeight ?? 0,
+        term: host?.terminalType,
+        envs: host?.envs?.reduce<Record<string, string>>((prev, cur) => {
+          prev[cur.key] = cur.value;
+          return prev;
+        }, {}),
+        size: {
+          col: terminal.cols,
+          row: terminal.rows,
+          width: terminal.element?.clientWidth ?? 0,
+          height: terminal.element?.clientHeight ?? 0,
+        },
       });
 
       if (host?.startupCommand) {

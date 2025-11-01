@@ -1,8 +1,14 @@
-import { Box, type SxProps, type Theme } from '@mui/material';
-import { useShell, XTerminal, TERMINAL_THEMES_MAP, useSession } from 'shared';
+import { alpha, Box, type SxProps, type Theme } from '@mui/material';
+import {
+  useShell,
+  XTerminal,
+  TERMINAL_THEMES_MAP,
+  useSession,
+  getHostDesc,
+} from 'shared';
 import { type Host } from 'tauri-plugin-data';
 import { useMemoizedFn } from 'ahooks';
-import { useLayoutEffect } from 'react';
+import { useLayoutEffect, useMemo } from 'react';
 import { SSHSessionCheckServerKey } from 'tauri-plugin-ssh';
 
 import openUrl from '@/utils/openUrl';
@@ -69,6 +75,17 @@ export default function SSHTerminal({
     onLoadingChange(isLoading);
   });
 
+  const color = useMemo(() => {
+    const foreground = TERMINAL_THEMES_MAP.get(host.terminalSettings?.theme)
+      ?.theme.foreground;
+
+    if (!foreground) {
+      return undefined;
+    }
+
+    return alpha(foreground, 0.1);
+  }, [host.terminalSettings?.theme]);
+
   useLayoutEffect(() => {
     memoizedOnLoadingChange(loading || !!error);
   }, [memoizedOnLoadingChange, loading, error]);
@@ -118,6 +135,20 @@ export default function SSHTerminal({
           onResize={onTerminalResize}
           onOpenUrl={openUrl}
         />
+        <Box
+          sx={{
+            position: 'absolute',
+            top: 20,
+            right: 20,
+            color: color,
+            padding: '4px 8px',
+            pointerEvents: 'none',
+            fontSize: 24,
+            fontWeight: 500,
+          }}
+        >
+          {getHostDesc(host)}
+        </Box>
       </Box>
       {(loading || error || !terminal) && (
         <SSHLoading
