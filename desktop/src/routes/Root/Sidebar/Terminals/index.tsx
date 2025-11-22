@@ -14,8 +14,7 @@ import {
   ListItemIcon,
   ListItemText,
 } from '@mui/material';
-
-import { type TerminalAtom, useTerminalsAtomWithApi } from '@/atom/terminalsAtom';
+import { type TerminalAtom, useTerminalsAtomWithApi } from 'shared';
 
 type TerminalsProps = {
   expand?: boolean;
@@ -33,15 +32,15 @@ export default function Terminals({ expand, onClick }: TerminalsProps) {
       navigate(`/terminal/${item.uuid}`, { replace: true });
       onClick?.();
     },
-    [navigate, onClick],
+    [navigate, onClick]
   );
 
   const onListItemCloseClick = useCallback(
     (event: MouseEvent<HTMLButtonElement>, item: TerminalAtom) => {
       event.stopPropagation();
-      const [, items] = terminalsAtomWithApi.delete(item.uuid);
+      const [, map] = terminalsAtomWithApi.delete(item.uuid);
       if (match?.params.uuid === item.uuid) {
-        const first = items?.[0];
+        const first = map.values().next().value;
         if (first) {
           navigate(`/terminal/${first.uuid}`, { replace: true });
         } else {
@@ -49,12 +48,12 @@ export default function Terminals({ expand, onClick }: TerminalsProps) {
         }
       }
     },
-    [match?.params.uuid, navigate, terminalsAtomWithApi],
+    [match?.params.uuid, navigate, terminalsAtomWithApi]
   );
 
   return (
     <List>
-      {terminalsAtomWithApi.state.map((item) => (
+      {[...terminalsAtomWithApi.state.values()].map((item) => (
         <ListItem
           key={item.uuid}
           disablePadding
@@ -71,7 +70,7 @@ export default function Terminals({ expand, onClick }: TerminalsProps) {
                   path: `/terminal/${item.uuid}`,
                   end: true,
                 },
-                pathname,
+                pathname
               )
             }
           >

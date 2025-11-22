@@ -1,28 +1,46 @@
-import { Box, Icon, LinearProgress, type SxProps, type Theme } from '@mui/material';
-import { SSHSessionCheckServerKey } from 'tauri-plugin-ssh';
-import { type Host } from 'tauri-plugin-data';
+import {
+  Box,
+  Icon,
+  LinearProgress,
+  type SxProps,
+  type Theme,
+} from '@mui/material';
+import { get } from 'lodash-es';
 
-import ErrorInfo from './ErrorInfo';
+import { getHostName } from '@/utils/host';
 
-type SSHLoadingProps = {
-  host: Host;
-  loading?: boolean;
-  error?: Error;
-  sx?: SxProps<Theme>;
-  onRefresh: () => unknown;
-  onRun: (checkServerKey?: SSHSessionCheckServerKey) => unknown;
-  onClose?: () => unknown;
+import { Loading } from '../Loading';
+
+import DefaultError from './DefaultError';
+import UnknownKey from './UnknownKey';
+import AuthenticationError from './AuthenticationError';
+import type { ErrorProps } from './common';
+
+const STATUS_BUTTONS = {
+  ConnectFailed: DefaultError,
+  UnknownKey: UnknownKey,
+  AuthenticationError: AuthenticationError,
+  default: DefaultError,
 };
 
-export default function SSHLoading({
+type SSHLoadingProps = {
+  sx?: SxProps<Theme>;
+} & ErrorProps;
+
+export function SSHLoading({
   host,
   loading,
   error,
   sx,
-  onRefresh,
-  onRun,
+  onReConnect,
+  onReAuth,
+  onRetry,
   onClose,
+  onOpenAddKey,
 }: SSHLoadingProps) {
+  const errorType = get(error as never, 'type') as keyof typeof STATUS_BUTTONS;
+
+  const render = STATUS_BUTTONS[errorType] || STATUS_BUTTONS.default;
   return (
     <Box
       sx={[
@@ -85,7 +103,7 @@ export default function SSHLoading({
                 textOverflow: 'ellipsis',
               }}
             >
-              {host.name || `${host.hostname}:${host.port}`}
+              {getHostName(host)}
             </Box>
             <Box
               sx={{
@@ -104,21 +122,29 @@ export default function SSHLoading({
             p: 1.5,
           }}
         >
-          <LinearProgress color={!loading && error ? 'error' : 'primary'} />
+          <LinearProgress color={error ? 'error' : 'primary'} />
         </Box>
-        {!loading && error && (
+        {!!error && (
           <Box
             sx={{
               px: 1.5,
               py: 1,
+              mx: 'auto',
+              my: 2,
             }}
           >
-            <ErrorInfo
-              error={error}
-              onRefresh={onRefresh}
-              onRun={onRun}
-              onClose={onClose}
-            />
+            <Loading loading={loading}>
+              {render({
+                host,
+                loading,
+                error,
+                onReConnect,
+                onReAuth,
+                onRetry,
+                onClose,
+                onOpenAddKey,
+              })}
+            </Loading>
           </Box>
         )}
       </Box>

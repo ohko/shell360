@@ -1,94 +1,43 @@
-import { Box, alpha, type SxProps, type Theme } from '@mui/material';
+import { Box, type SxProps, type Theme } from '@mui/material';
 import {
-  useShell,
+  SSHLoading,
   XTerminal,
   TERMINAL_THEMES_MAP,
-  useSession,
-  getHostDesc,
+  type TerminalAtom,
 } from 'shared';
-import { type Host } from 'tauri-plugin-data';
-import { useMemoizedFn } from 'ahooks';
-import { SSHSessionCheckServerKey } from 'tauri-plugin-ssh';
-import { useLayoutEffect, useMemo } from 'react';
+import { useTerminal } from 'shared';
 
 import openUrl from '@/utils/openUrl';
-
-import SSHLoading from '../SSHLoading';
 
 import Sftp from './Sftp';
 
 type SSHTerminalProps = {
-  host: Host;
+  item: TerminalAtom;
   sx: SxProps<Theme>;
-  onLoadingChange: (loading: boolean) => unknown;
-  onReady?: () => unknown;
-  onClose?: () => unknown;
-};
-
-export type TauriSourceError = {
-  type: string;
-  message: string;
+  onClose: () => unknown;
+  onOpenAddKey: () => unknown;
 };
 
 export default function SSHTerminal({
-  host,
+  item,
   sx,
   onClose,
-  onLoadingChange,
+  onOpenAddKey,
 }: SSHTerminalProps) {
   const {
+    loading,
+    error,
     session,
-    loading: sessionLoading,
-    error: sessionError,
-    runAsync: sessionRunAsync,
-    refreshAsync: sessionRefreshAsync,
-  } = useSession({ host, onDisconnect: onClose });
-
-  const {
+    currentJumpHostChainItem,
+    onReConnect,
+    onReAuth,
+    onRetry,
+    terminal,
     onTerminalReady,
     onTerminalData,
     onTerminalBinaryData,
     onTerminalResize,
-    terminal,
-    loading: sshLoading,
-    error: sshError,
-    runAsync: sshRunAsync,
-    refreshAsync: sshRefreshAsync,
-  } = useShell({ session, host, onClose });
-
-  const run = useMemoizedFn(
-    async (checkServerKey?: SSHSessionCheckServerKey) => {
-      await sessionRunAsync(checkServerKey);
-      await sshRunAsync();
-    }
-  );
-
-  const refresh = useMemoizedFn(async () => {
-    await sessionRefreshAsync();
-    await sshRefreshAsync();
-  });
-
-  const error = sessionError || sshError;
-  const loading = sessionLoading || sshLoading;
-
-  const memoizedOnLoadingChange = useMemoizedFn((isLoading: boolean) => {
-    onLoadingChange(isLoading);
-  });
-
-  const color = useMemo(() => {
-    const foreground = TERMINAL_THEMES_MAP.get(host.terminalSettings?.theme)
-      ?.theme.foreground;
-
-    if (!foreground) {
-      return undefined;
-    }
-
-    return alpha(foreground, 0.1);
-  }, [host.terminalSettings?.theme]);
-
-  useLayoutEffect(() => {
-    memoizedOnLoadingChange(loading || !!error);
-  }, [memoizedOnLoadingChange, loading, error]);
+  } = useTerminal({ item, onClose });
 
   return (
     <Box
@@ -126,34 +75,22 @@ export default function SSHTerminal({
         data-paste="true"
       >
         <XTerminal
-          fontFamily={host.terminalSettings?.fontFamily}
-          fontSize={host.terminalSettings?.fontSize}
-          theme={TERMINAL_THEMES_MAP.get(host.terminalSettings?.theme)?.theme}
+          fontFamily={item.host.terminalSettings?.fontFamily}
+          fontSize={item.host.terminalSettings?.fontSize}
+          theme={
+            TERMINAL_THEMES_MAP.get(item.host.terminalSettings?.theme)?.theme
+          }
           onReady={onTerminalReady}
           onData={onTerminalData}
           onBinary={onTerminalBinaryData}
           onResize={onTerminalResize}
           onOpenUrl={openUrl}
         />
-        <Box
-          sx={{
-            position: 'absolute',
-            top: 20,
-            right: 20,
-            color: color,
-            padding: '4px 8px',
-            pointerEvents: 'none',
-            fontSize: 24,
-            fontWeight: 500,
-          }}
-        >
-          {getHostDesc(host)}
-        </Box>
       </Box>
-      {(loading || error || !terminal) && (
+      {(!terminal || loading || error) && (
         <SSHLoading
-          host={host}
-          loading={loading}
+          host={currentJumpHostChainItem?.host || item.host}
+          loading={currentJumpHostChainItem?.loading}
           error={error}
           sx={{
             width: '100%',
@@ -165,14 +102,14 @@ export default function SSHTerminal({
             left: '0',
             zIndex: 10,
           }}
-          onRefresh={refresh}
-          onRun={run}
+          onReConnect={onReConnect}
+          onReAuth={onReAuth}
+          onRetry={onRetry}
           onClose={onClose}
+          onOpenAddKey={onOpenAddKey}
         />
       )}
-      {!sessionLoading && !sessionError && session && (
-        <Sftp session={session}></Sftp>
-      )}
+      {!loading && !error && session && <Sftp session={session} />}
     </Box>
   );
 }

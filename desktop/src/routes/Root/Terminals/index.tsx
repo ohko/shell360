@@ -1,29 +1,21 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useMatch, useNavigate } from 'react-router-dom';
+import { type TerminalAtom, useTerminalsAtomWithApi } from 'shared';
 
 import SSHTerminal from '@/components/SSHTerminal';
-import { type TerminalAtom, useTerminalsAtomWithApi } from '@/atom/terminalsAtom';
+import AddKey from '@/components/AddKey';
 
 export default function Terminals() {
   const match = useMatch('/terminal/:uuid');
   const navigate = useNavigate();
   const terminalsAtomWithApi = useTerminalsAtomWithApi();
-
-  const onLoadingChange = useCallback(
-    (item: TerminalAtom, loading: boolean) => {
-      terminalsAtomWithApi.update({
-        ...item,
-        loading,
-      });
-    },
-    [terminalsAtomWithApi]
-  );
+  const [addKeyOpen, setAddKeyOpen] = useState(false);
 
   const onClose = useCallback(
     (item: TerminalAtom) => {
-      const [, items] = terminalsAtomWithApi.delete(item.uuid);
+      const [, map] = terminalsAtomWithApi.delete(item.uuid);
       if (match?.params.uuid === item.uuid) {
-        const first = items[0];
+        const first = map.values().next().value;
         if (first) {
           navigate(`/terminal/${first.uuid}`, { replace: true });
         } else {
@@ -35,14 +27,15 @@ export default function Terminals() {
   );
 
   useEffect(() => {
-    if (!terminalsAtomWithApi.state.length) {
+    if (!terminalsAtomWithApi.state.size && match) {
       navigate('/', { replace: true });
     }
-  }, [terminalsAtomWithApi, navigate]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [terminalsAtomWithApi.state.size, navigate]);
 
   return (
     <>
-      {terminalsAtomWithApi.state.map((item) => {
+      {[...terminalsAtomWithApi.state.values()].map((item) => {
         const visible = match?.params.uuid === item.uuid;
         return (
           <SSHTerminal
@@ -52,12 +45,17 @@ export default function Terminals() {
               flexGrow: 1,
               flexShrink: 0,
             }}
-            host={item.host}
-            onLoadingChange={(loading) => onLoadingChange(item, loading)}
+            item={item}
             onClose={() => onClose(item)}
+            onOpenAddKey={() => setAddKeyOpen(true)}
           />
         );
       })}
+      <AddKey
+        open={addKeyOpen}
+        onCancel={() => setAddKeyOpen(false)}
+        onOk={() => setAddKeyOpen(false)}
+      />
     </>
   );
 }

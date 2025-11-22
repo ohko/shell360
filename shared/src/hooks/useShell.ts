@@ -10,9 +10,19 @@ export interface UseShellOpts {
   session?: SSHSession;
   host?: Host;
   onClose?: () => void;
+  onBefore?: () => void;
+  onSuccess?: () => void;
+  onError?: (error: unknown) => void;
 }
 
-export function useShell({ session, host, onClose }: UseShellOpts) {
+export function useShell({
+  session,
+  host,
+  onClose,
+  onBefore,
+  onSuccess,
+  onError,
+}: UseShellOpts) {
   const [terminal, setTerminal] = useState<Terminal>();
 
   const shellRef = useRef<SSHShell>(null);
@@ -27,7 +37,12 @@ export function useShell({ session, host, onClose }: UseShellOpts) {
         throw new Error('session is undefined');
       }
 
-      shellRef.current?.close();
+      try {
+        await shellRef.current?.close();
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error(e);
+      }
       const shell = new SSHShell({
         session,
         onData: (data: Uint8Array) => {
@@ -63,6 +78,9 @@ export function useShell({ session, host, onClose }: UseShellOpts) {
     },
     {
       ready: !!terminal && !!session,
+      onBefore,
+      onSuccess,
+      onError,
     }
   );
 

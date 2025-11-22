@@ -8,9 +8,9 @@ import {
   useHosts,
   useKeys,
   usePortForwardings,
+  useTerminalsAtomValue,
 } from 'shared';
 
-import { useTerminalsAtom } from '@/atom/terminalsAtom';
 import { TITLE_BAR_HEIGHT } from '@/constants/titleBar';
 import { useColorsAtomWithApi } from '@/atom/colorsAtom';
 import { themeAtom } from '@/atom/themeAtom';
@@ -21,7 +21,7 @@ import Terminals from '../Terminals';
 export default function Content() {
   const match = useMatch('/terminal/:uuid');
   const isShowTerminal = !!match?.params.uuid;
-  const [terminals] = useTerminalsAtom();
+  const terminals = useTerminalsAtomValue();
   const colorsAtomWithApi = useColorsAtomWithApi();
 
   const themeValue = useAtomValue(themeAtom);
@@ -31,7 +31,7 @@ export default function Content() {
   usePortForwardings();
 
   const activeTerminal = useMemo(
-    () => terminals.find((item) => item.uuid === match?.params.uuid),
+    () => terminals.get(match?.params.uuid as string),
     [terminals, match?.params.uuid]
   );
 
@@ -41,10 +41,15 @@ export default function Content() {
       TERMINAL_THEMES_MAP.get(
         activeTerminal?.host.terminalSettings?.theme as string
       ) ?? TERMINAL_THEMES[0];
-    const bgColor =
-      activeTerminal?.loading === false
-        ? theme.theme.background ?? defaultBackground
-        : defaultBackground;
+
+    const isLoading =
+      activeTerminal?.jumpHostChain.some(
+        (it) => it.status !== 'authenticated' || it.loading || it.error
+      ) || activeTerminal?.status !== 'success';
+
+    const bgColor = isLoading
+      ? defaultBackground
+      : theme.theme.background ?? defaultBackground;
 
     colorsAtomWithApi.setColors({
       bgColor,
