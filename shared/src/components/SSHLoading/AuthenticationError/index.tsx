@@ -1,17 +1,19 @@
 import { Box, Button, ButtonGroup, Icon } from '@mui/material';
 import { useForm } from 'react-hook-form';
 import { AuthenticationMethod, updateHost } from 'tauri-plugin-data';
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
+import { get } from 'lodash-es';
 
-import {
-  AuthenticationForm,
-  type AuthenticationFormFields,
-} from '@/components/AuthenticationForm';
 import { Dropdown } from '@/components/Dropdown';
 import { useHosts } from '@/hooks/useHosts';
 
 import ErrorText from '../ErrorText';
 import { StatusButton, type ErrorProps } from '../common';
+
+import {
+  AuthenticationForm,
+  type AuthenticationFormFields,
+} from './AuthenticationForm';
 
 export default function AuthenticationError({
   host,
@@ -21,6 +23,7 @@ export default function AuthenticationError({
   onOpenAddKey,
 }: ErrorProps) {
   const { refresh: refreshHosts } = useHosts();
+
   const formApi = useForm<AuthenticationFormFields>({
     defaultValues: {
       username: '',
@@ -36,6 +39,40 @@ export default function AuthenticationError({
       keyId: host?.keyId ?? '',
     },
   });
+
+  // const authMethods = useMemo(() => {
+  //   const kind = get(error, 'kind');
+  //   if (kind === 'Password' || kind === 'PublicKey' || kind === 'Certificate') {
+  //     return get(error, 'methodSet');
+  //   }
+  // }, [error]);
+
+  // console.log(authMethods);
+
+  const errorInfo = useMemo(() => {
+    const kind = get(error, 'kind');
+    const message = get(error, 'message');
+    if (kind === 'Password' || kind === 'PublicKey' || kind === 'Certificate') {
+      const methodSet = get(error, 'methodSet', []) as string[];
+
+      return {
+        title: message,
+        message: methodSet.includes(kind) ? (
+          message
+        ) : (
+          <>
+            The <b>{kind}</b> authentication method is not supported. The server
+            only supports the <b>{methodSet.join(', ')}</b> authentication
+            method.
+          </>
+        ),
+      };
+    }
+    return {
+      title: 'Authentication failed',
+      message: message,
+    };
+  }, [error]);
 
   const onContinue = useCallback(
     async (values: AuthenticationFormFields, isSave: boolean) => {
@@ -67,7 +104,7 @@ export default function AuthenticationError({
 
   return (
     <Box component="form" noValidate autoComplete="off">
-      <ErrorText error={error} />
+      <ErrorText title={errorInfo.title} message={errorInfo.message} />
       <AuthenticationForm formApi={formApi} onOpenAddKey={onOpenAddKey} />
       <Box
         sx={{

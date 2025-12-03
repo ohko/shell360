@@ -1,26 +1,101 @@
 use std::sync::{PoisonError, TryLockError};
 
-use russh::keys::ssh_key::Fingerprint;
+use russh::{MethodKind, MethodSet, client::Prompt, keys::ssh_key::Fingerprint};
 use serde::{Serialize, Serializer};
 use serde_json::json;
 use strum::AsRefStr;
 use thiserror::Error;
 
-#[derive(Debug, Error, Serialize, AsRefStr)]
-pub enum AuthenticationMethodError {
-  #[error("The username or password is incorrect")]
-  Password,
-  #[error("The username or key is incorrect")]
-  PublicKey,
-  #[error("The username or certificate is incorrect")]
-  Certificate,
+#[derive(Debug, Clone, Serialize)]
+pub struct KeyboardInteractiveData {
+  pub name: String,
+  pub instructions: String,
+  pub prompts: Vec<KeyboardInteractivePrompt>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct KeyboardInteractivePrompt {
+  pub prompt: String,
+  pub echo: bool,
+}
+
+impl From<Prompt> for KeyboardInteractivePrompt {
+  fn from(value: Prompt) -> Self {
+    Self {
+      prompt: value.prompt,
+      echo: value.echo,
+    }
+  }
+}
+
+#[derive(Debug, Error, AsRefStr)]
+pub enum AuthenticationError {
+  #[error(transparent)]
+  RusshError(#[from] russh::Error),
+  #[error(transparent)]
+  RusshKeysError(#[from] russh::keys::Error),
+  #[error(transparent)]
+  Timeout(#[from] tokio::time::error::Elapsed),
+  #[error("Not found session")]
+  NotFoundSession,
+  #[error("Session closed")]
+  SessionClosed,
+  #[error("Authentication failed with password")]
+  Password(MethodSet, bool),
+  #[error("Authentication failed with public key")]
+  PublicKey(MethodSet, bool),
+  #[error("Authentication failed with certificate")]
+  Certificate(MethodSet, bool),
+  #[error("Authentication failed with keyboard interactive")]
+  KeyboardInteractive(MethodSet, bool),
+  #[error("Keyboard interactive need response")]
+  KeyboardInteractiveInfoRequest(KeyboardInteractiveData),
   #[error("{0}")]
   Error(String),
 }
 
-impl AuthenticationMethodError {
+impl AuthenticationError {
   pub fn new<T: Into<String>>(message: T) -> Self {
     Self::Error(message.into())
+  }
+}
+
+impl Serialize for AuthenticationError {
+  fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+  where
+    S: Serializer,
+  {
+    let json_value = match self {
+      AuthenticationError::Password(method_set, partial_success)
+      | AuthenticationError::PublicKey(method_set, partial_success)
+      | AuthenticationError::Certificate(method_set, partial_success)
+      | AuthenticationError::KeyboardInteractive(method_set, partial_success) => json!({
+        "type": "AuthenticationError",
+        "message": self.to_string(),
+        "kind": self.as_ref(),
+        "methodSet": method_set.iter().map(|method_kind| match method_kind {
+            MethodKind::None => "None",
+            MethodKind::Password => "Password",
+            MethodKind::PublicKey => "PublicKey",
+            MethodKind::HostBased => "Certificate",
+            MethodKind::KeyboardInteractive => "KeyboardInteractive"
+        }).collect::<Vec<&str>>(),
+        "partialSuccess": partial_success,
+      }),
+      AuthenticationError::KeyboardInteractiveInfoRequest(keyboard_interactive_data) => json!({
+        "type": "AuthenticationError",
+        "message": self.to_string(),
+        "kind": self.as_ref(),
+        "keyboardInteractiveData": keyboard_interactive_data,
+      }),
+      _ => json!({
+        "type": "AuthenticationError",
+        "message": self.to_string(),
+        "kind": self.as_ref(),
+      }),
+    };
+
+    json_value.serialize(serializer)
   }
 }
 
@@ -77,9 +152,6 @@ pub enum SSHError {
     fingerprint: Fingerprint,
   },
 
-  #[error(transparent)]
-  AuthenticationError(#[from] AuthenticationMethodError),
-
   #[error("Not found session")]
   NotFoundSession,
 
@@ -113,11 +185,6 @@ impl Serialize for SSHError {
         "message": self.to_string(),
         "algorithm": algorithm,
         "fingerprint": fingerprint.to_string(),
-      }),
-      SSHError::AuthenticationError(authentication_method_error) => json!({
-        "type": self.as_ref(),
-        "message": self.to_string(),
-        "authenticationMethod": authentication_method_error.as_ref(),
       }),
       _ => json!({
         "type": self.as_ref(),

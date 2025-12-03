@@ -1,6 +1,11 @@
 import { Channel, invoke } from '@tauri-apps/api/core';
 import { v4 as uuidV4 } from 'uuid';
 
+export type SSHSessionDisconnectEvent = {
+  type: 'disconnect';
+  data: string;
+};
+
 export type SSHSessionOpts = {
   onDisconnect?: (data: SSHSessionDisconnectEvent) => unknown;
 };
@@ -16,17 +21,13 @@ export enum SSHSessionCheckServerKey {
   AddAndContinue = 'AddAndContinue',
 }
 
-export type SSHSessionDisconnectEvent = {
-  type: 'disconnect';
-  data: string;
-};
-
 export type SSHSessionIpcChannelEvent = SSHSessionDisconnectEvent;
 
 export enum AuthenticationMethod {
   Password = 'Password',
   PublicKey = 'PublicKey',
   Certificate = 'Certificate',
+  KeyboardInteractive = 'KeyboardInteractive',
 }
 
 export type SSHSessionAuthenticatePasswordOpts = {
@@ -43,6 +44,11 @@ export type SSHSessionAuthenticateCertificateOpts = {
   privateKey: string;
   passphrase?: string;
   certificate: string;
+};
+
+export type SSHSessionAuthenticateKeyboardInteractiveOpts = {
+  username: string;
+  prompts?: string[];
 };
 
 export class SSHSession {
@@ -64,7 +70,9 @@ export class SSHSession {
       sshSessionId: this.sshSessionId,
       checkServerKey,
       ipcChannel: new Channel<SSHSessionIpcChannelEvent>((data) => {
-        this.opts.onDisconnect?.(data);
+        if (data.type === 'disconnect') {
+          this.opts.onDisconnect?.(data);
+        }
       }),
     });
   }
@@ -106,6 +114,19 @@ export class SSHSession {
         privateKey: opts.privateKey,
         passphrase: opts.passphrase,
         certificate: opts.certificate,
+      },
+      sshSessionId: this.sshSessionId,
+    });
+  }
+
+  authenticate_keyboard_interactive(
+    opts: SSHSessionAuthenticateKeyboardInteractiveOpts
+  ): Promise<string> {
+    return invoke<string>('plugin:ssh|session_authenticate', {
+      username: opts.username,
+      authenticationData: {
+        authenticationMethod: AuthenticationMethod.KeyboardInteractive,
+        prompts: opts.prompts,
       },
       sshSessionId: this.sshSessionId,
     });

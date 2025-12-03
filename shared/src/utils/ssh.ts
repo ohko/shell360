@@ -96,12 +96,19 @@ export async function establishJumpHostChainConnections(
             privateKey: key?.privateKey || '',
             passphrase: key?.passphrase || '',
           });
-        } else {
+        } else if (
+          item.host.authenticationMethod === AuthenticationMethod.Certificate
+        ) {
           await item.session.authenticate_certificate({
             username: item.host.username,
             privateKey: key?.privateKey || '',
             passphrase: key?.passphrase || '',
             certificate: key?.certificate || '',
+          });
+        } else {
+          await item.session.authenticate_keyboard_interactive({
+            username: item.host.username,
+            prompts: [],
           });
         }
 
@@ -112,8 +119,8 @@ export async function establishJumpHostChainConnections(
       prevJumpHostSession = item.session;
     } catch (error) {
       item.error = error;
-      const errorType = get(error, 'type');
-      if (errorType === 'NotFoundSession' || errorType === 'Timeout') {
+      const errorKind = get(error, 'kind');
+      if (errorKind === 'NotFoundSession' || errorKind === 'Timeout') {
         item.status = 'connecting';
       }
 
